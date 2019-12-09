@@ -2,6 +2,10 @@ package decoder
 
 import (
 	"bufio"
+	"context"
+	"data-collector/capturer"
+	"data-collector/common"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
@@ -9,109 +13,125 @@ import (
 )
 
 var httpRequestFirstLineReg *regexp.Regexp
-var httpResponcetFirstLineReg *regexp.Regexp
+var httpResponceFirstLineReg *regexp.Regexp
 
 func init() {
 	httpRequestFirstLineReg, _ = regexp.Compile(`((GET)|(HEAD)|(POST)|(PUT)|(DELETE)|(PATCH))\s.*\sHTTP\/\d\.\d`)
-	httpResponcetFirstLineReg, _ = regexp.Compile(`HTTP\/\d\.\d\s(\d{0,3})\s\w+`)
+	httpResponceFirstLineReg, _ = regexp.Compile(`HTTP\/\d\.\d\s(\d{0,3})\s\w+`)
+	capturer.RegisterDecoder("http", NewHttpDecoder)
 }
 
 type httpDecoder struct {
 }
 
-func (h *httpDecoder) Parse(ctx *ParseCtx) {
-	ctx.Conn.C2SStream()
-	r1 := ctx.Conn.C2SStream()
-	r2 := ctx.Conn.S2CStream()
+func (h *httpDecoder) Parse(ctx context.Context, conn *capturer.TCPConn, actorCtx *common.ActorTreeContext) {
 
-	r3 := newStreamWarpper(r1, getValidStartByteFromRequest)
-	r4 := newStreamWarpper(r2, getValidStartByteFromResponce)
+	r5 := bufio.NewReader(conn.C2SStream())
+	r6 := bufio.NewReader(conn.S2CStream())
 
-	r5 := bufio.NewReader(r3)
-	r6 := bufio.NewReader(r4)
-
-	reqChan := make(chan *http.Request, 1)
+	//reqChan := make(chan *http.Request, 1)
 	shutChan := make(chan interface{}, 1)
 	repChan := make(chan interface{}, 1)
 
 	go func() {
 		for {
-			req, err := http.ReadRequest(r5)
+			fmt.Println("start parse http request")
+			_, err := http.ReadRequest(r5)
 			if err != nil {
 				if err == InternalReaderNil {
 					continue
 				} else {
-					return
-					log.WithField("conn", ctx.Conn).Warnf("parse http request err %s\n", err.Error())
+					log.WithFields(log.Fields{"conn": conn, "errMsg": err.Error()}).Warn("parse http request err")
 					shutChan <- true
+					return
 				}
 			}
-			reqChan <- req
+			fmt.Println("parse http request success and send 2 channel")
+			//reqChan <- req
+			//fmt.Println(" send 2 channel success")
 		}
 	}()
 
 	go func() {
+		conn.S2CStream().SetValidStatus()
 		select {
 		case <-shutChan:
 			close(repChan)
 			return
-		case req := <-reqChan:
+		//case req := <-reqChan:
+		default:
 			for {
-				rep, err := http.ReadResponse(r6, req)
-				if err != nil {
-					if err == InternalReaderNil {
-						continue
-					} else {
-						log.WithField("conn", ctx.Conn).Warnf("parse http request err %s\n", err.Error())
-						close(repChan)
-						return
-					}
-				}
-				repChan <- rep
-				break
+				r6.ReadLine()
+				//fmt.Println("start parse http responce")
+				//rep, err := http.ReadResponse(r6, nil)
+				////fmt.Println("start parse http responce success")
+				//if err != nil {
+				//	if err == InternalReaderNil {
+				//		continue
+				//	} else {
+				//		log.WithField("conn", conn).Warnf("parse http request err %s\n", err.Error())
+				//		close(repChan)
+				//		return
+				//	}
+				//}
+				//repChan <- rep
 			}
 		}
 	}()
 
 	for r := range repChan {
-		ctx.SendBackChan <- r
+		fmt.Println(r)
 	}
 }
 
-func getValidStartByteFromRequest(reader io.Reader) ([]byte, error) {
+func (h *httpDecoder) Name() string {
+	return "http"
+}
+
+func (h *httpDecoder) LocateToValidStartInC2SStream(reader io.Reader) (int, error) {
+	var totalCount int = 0
 	br := bufio.NewReader(reader)
 	for {
-		line, prefix, err := br.ReadLine()
+		line, err := br.ReadSlice('\r')
 		if err != nil {
-			return nil, err
+			return -1, err
 		}
-		if prefix {
+		if line[len(line)-1] != '\r' {
+			totalCount += len(line) + 1
 			continue
 		}
-		l := string(line)
+		l := string(line[:len(line)-1])
 		if !checkIsHttpRequestStart(l) {
+			totalCount += len(line) + 2
 			continue
 		}
-		return line, err
+		return totalCount, nil
 	}
 }
 
-func getValidStartByteFromResponce(reader io.Reader) ([]byte, error) {
+func (h *httpDecoder) LocateToValidStartInS2CStream(reader io.Reader) (int, error) {
+	var totalCount int = 0
 	br := bufio.NewReader(reader)
 	for {
-		line, prefix, err := br.ReadLine()
+		line, err := br.ReadSlice('\n')
 		if err != nil {
-			return nil, err
+			return -1, err
 		}
-		if prefix {
+		if line[len(line)-1] != '\r' {
+			totalCount += len(line) + 1
 			continue
 		}
-		l := string(line)
+		l := string(line[:len(line)-1])
 		if !checkIsHttpResponceStart(l) {
+			totalCount += len(line) + 2
 			continue
 		}
-		return line, err
+		return totalCount, nil
 	}
+}
+
+func (h *httpDecoder) ValidateType() byte {
+	return 1
 }
 
 func checkIsHttpRequestStart(line string) bool {
@@ -119,5 +139,9 @@ func checkIsHttpRequestStart(line string) bool {
 }
 
 func checkIsHttpResponceStart(line string) bool {
-	return httpResponcetFirstLineReg.MatchString(line)
+	return httpResponceFirstLineReg.MatchString(line)
+}
+
+func NewHttpDecoder() capturer.Interface {
+	return new(httpDecoder)
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/tcpassembly"
+	//"github.com/google/gopacket/tcpassembly"
 	log "github.com/sirupsen/logrus"
 	"net"
 )
@@ -185,6 +185,9 @@ func (c *capture) processCaptureStatusSetMsg(context actor.Context, msg *msg.Cap
 }
 
 func (c *capture) ensureRunning() error {
+	if len(c.bpfStr) == 0 {
+		return nil
+	}
 	if c.handle == nil {
 		handle, err := pcap.OpenLive(c.deviceName, 65535, false, pcap.BlockForever)
 		if err != nil {
@@ -200,7 +203,7 @@ func (c *capture) ensureRunning() error {
 
 		go func() {
 			sf := newDSF(c.actorTreeCtx, c)
-			assembler := tcpassembly.NewAssembler(tcpassembly.NewStreamPool(sf))
+			assembler := NewAssembler(NewStreamPool(sf))
 			for {
 				select {
 				case packet := <-packets:
@@ -222,6 +225,11 @@ func (c *capture) ensureRunning() error {
 						continue
 					}
 					tcp := packet.TransportLayer().(*layers.TCP)
+					if len(tcp.Payload) > 10 {
+						fmt.Printf("capture a package %s, payload=%d, content=%d\n", packet.TransportLayer().TransportFlow().String(), len(tcp.LayerPayload()), len(tcp.LayerContents()))
+					}
+					//fmt.Println(len(tcp.LayerPayload()))
+					//fmt.Println(len(tcp.LayerContents()))
 					assembler.AssembleWithTimestamp(
 						packet.NetworkLayer().NetworkFlow(),
 						tcp, packet.Metadata().Timestamp,
@@ -240,7 +248,7 @@ func (c *capture) ensureRunning() error {
 }
 
 func (c *capture) ensureStopped() {
-
+	//todo
 }
 
 func (c *capture) processAddrUpdateMsg(context actor.Context, msg AddrUpdateMsg) {
