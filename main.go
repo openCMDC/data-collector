@@ -22,7 +22,7 @@ func init() {
 	log.SetOutput(os.Stdout)
 
 	// 设置日志级别为warn以上
-	log.SetLevel(log.WarnLevel)
+	log.SetLevel(log.ErrorLevel)
 }
 
 func main() {
@@ -42,7 +42,7 @@ func main() {
 	//}
 	//actorTreeCtx.EndpointsManager = em
 
-	addr, err := common.ParseIpAndPort2TCPAddr("120.55.51.202", "8768")
+	addr, err := common.ParseIpAndPort2TCPAddr("120.92.182.58", "80")
 	if err != nil {
 		fmt.Println(err.Error())
 		return

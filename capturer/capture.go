@@ -1,11 +1,14 @@
 package capturer
 
 import (
+	"bufio"
 	"data-collector/common"
+	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/tcpassembly"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 )
@@ -59,7 +62,39 @@ func (sf *DefaultStreamFactory) New(netLayer, transLayer gopacket.Flow) tcpassem
 	s.netLayer = netLayer
 	s.transportLayer = transLayer
 	s.streamFactory = sf
-	sf.workChan <- s
+
+	if netLayer.Src().String() == "192.168.31.101" {
+		go func() {
+			for {
+				_, err := http.ReadRequest(bufio.NewReader(&reader))
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				//fmt.Println("req success")
+			}
+
+		}()
+	} else {
+		go func() {
+
+			for {
+				b := make([]byte, 0, 8)
+				c, err := reader.Read(b)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				if c == 0 {
+					continue
+				}
+				fmt.Println(b[0:c])
+			}
+
+		}()
+	}
+
+	//sf.workChan <- s
 	return &reader
 	//actorCtx := sf.actorTreeContext.GetActorContext()
 	//decoderManager := sf.actorTreeContext.GetDecoderManager()

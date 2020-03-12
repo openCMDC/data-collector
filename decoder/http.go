@@ -28,60 +28,45 @@ func (h *httpDecoder) Parse(ctx context.Context, conn *capturer.TCPConn, actorCt
 
 	r5 := bufio.NewReader(conn.C2SStream())
 	r6 := bufio.NewReader(conn.S2CStream())
-
-	//reqChan := make(chan *http.Request, 1)
 	shutChan := make(chan interface{}, 1)
 	repChan := make(chan interface{}, 1)
-
 	go func() {
-		for {
-			fmt.Println("start parse http request")
-			_, err := http.ReadRequest(r5)
-			if err != nil {
-				if err == InternalReaderNil {
-					continue
-				} else {
-					log.WithFields(log.Fields{"conn": conn, "errMsg": err.Error()}).Warn("parse http request err")
-					shutChan <- true
-					return
-				}
-			}
-			fmt.Println("parse http request success and send 2 channel")
-			//reqChan <- req
-			//fmt.Println(" send 2 channel success")
+
+		for range repChan {
+			fmt.Println("--------------")
 		}
 	}()
+	//reqChan := make(chan *http.Request, 1)
 
-	go func() {
-		conn.S2CStream().SetValidStatus()
-		select {
-		case <-shutChan:
-			close(repChan)
-			return
-		//case req := <-reqChan:
-		default:
-			for {
-				r6.ReadLine()
-				//fmt.Println("start parse http responce")
-				//rep, err := http.ReadResponse(r6, nil)
-				////fmt.Println("start parse http responce success")
-				//if err != nil {
-				//	if err == InternalReaderNil {
-				//		continue
-				//	} else {
-				//		log.WithField("conn", conn).Warnf("parse http request err %s\n", err.Error())
-				//		close(repChan)
-				//		return
-				//	}
-				//}
-				//repChan <- rep
+	for {
+		req, err := http.ReadRequest(r5)
+		if err != nil {
+			if err == InternalReaderNil {
+				continue
+			} else {
+				log.WithFields(log.Fields{"conn": conn, "errMsg": err.Error()}).Warn("parse http request err")
+				shutChan <- true
+				return
 			}
 		}
-	}()
+		fmt.Println("success parse req")
 
-	for r := range repChan {
-		fmt.Println(r)
+		rep, err := http.ReadResponse(r6, nil)
+		if err != nil {
+			if err == InternalReaderNil {
+				continue
+			} else {
+				log.WithFields(log.Fields{"conn": conn, "errMsg": err.Error()}).Warn("parse http request err")
+				shutChan <- true
+				return
+			}
+		}
+		fmt.Println("success parse rep")
+
+		rep.Request = req
+		repChan <- rep
 	}
+
 }
 
 func (h *httpDecoder) Name() string {

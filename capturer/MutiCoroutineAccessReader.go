@@ -3,7 +3,6 @@ package capturer
 import (
 	"data-collector/common"
 	"errors"
-	"fmt"
 	"github.com/google/gopacket/tcpassembly"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -46,9 +45,9 @@ func (r *StreamReader) Reassembled(reassembly []tcpassembly.Reassembly) {
 	//for _, re := range reassembly {
 	//	fmt.Errorf("receive bytes = %s \n", string(re.Bytes))
 	//}
-	fmt.Printf("send 2 chanel , channel size = %d \n", len(r.reassembled))
+	//fmt.Printf("send 2 chanel , channel size = %d \n", len(r.reassembled))
 	r.reassembled <- reassembly
-	fmt.Printf("send 2 chanel successd \n")
+	//fmt.Printf("send 2 chanel successd \n")
 	// comment for blocking
 	//<-r.done
 }
@@ -113,7 +112,7 @@ func (r *StreamReader) Read(p []byte) (int, error) {
 		}
 		length := copy(p, current.Bytes)
 		current.Bytes = current.Bytes[length:]
-		fmt.Printf("read string ------------ \n %s ------------\n", string(p[0:length]))
+		//fmt.Printf("read string ------------ \n %s ------------\n", string(p[0:length]))
 		return length, nil
 	}
 	return 0, io.EOF
@@ -283,16 +282,16 @@ func (m *ConcurrentReader) waitReaderReady() {
 }
 
 func (m *ConcurrentReader) SetReaderReady() {
-	for {
-		oldVal := atomic.LoadUint32(&m.status)
-		newVal := oldVal | readerReadyChecker
-		if newVal == oldVal {
-			return
-		}
-		if success := atomic.CompareAndSwapUint32(&m.status, oldVal, newVal); success {
-			return
-		}
-	}
+	//for {
+	//	oldVal := atomic.LoadUint32(&m.status)
+	//	newVal := oldVal | readerReadyChecker
+	//	if newVal == oldVal {
+	//		return
+	//	}
+	//	if success := atomic.CompareAndSwapUint32(&m.status, oldVal, newVal); success {
+	//		return
+	//	}
+	//}
 	close(m.ReaderBroadcast)
 }
 

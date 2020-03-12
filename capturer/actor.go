@@ -226,7 +226,7 @@ func (c *capture) ensureRunning() error {
 					}
 					tcp := packet.TransportLayer().(*layers.TCP)
 					if len(tcp.Payload) > 10 {
-						fmt.Printf("capture a package %s, payload=%d, content=%d\n", packet.TransportLayer().TransportFlow().String(), len(tcp.LayerPayload()), len(tcp.LayerContents()))
+						//fmt.Printf("capture a package %s, payload=%d, content=%d\n", packet.TransportLayer().TransportFlow().String(), len(tcp.LayerPayload()), len(tcp.LayerContents()))
 					}
 					//fmt.Println(len(tcp.LayerPayload()))
 					//fmt.Println(len(tcp.LayerContents()))
